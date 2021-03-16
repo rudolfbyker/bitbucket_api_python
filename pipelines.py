@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Dict
 import requests
 from Crypto.PublicKey import RSA
 from .exceptions import HTTPException
@@ -44,6 +44,45 @@ def put_key_pair(workspace, repository, user, password, public_key, private_key)
             'type': 'pipeline_ssh_key_pair',
             'public_key': public_key,
             'private_key': private_key,
+        },
+        auth=(user, password),
+    )
+
+    if not str(response.status_code).startswith("2"):
+        raise HTTPException(response)
+
+
+def get_known_hosts(workspace, repository, user, password) -> Dict:
+    response = requests.get(
+        # Trailing slash is significant for this resource URL.
+        url=f'https://api.bitbucket.org/2.0/repositories/{workspace}/{repository}/pipelines_config/ssh/known_hosts/',
+        auth=(user, password),
+    )
+
+    if not str(response.status_code).startswith("2"):
+        raise HTTPException(response)
+
+    return response.json()
+
+
+def post_known_host(workspace, repository, user, password, hostname, key_type, key) -> None:
+    # It looks like BitBucket will not respond with 409 for duplicate host names, so to prevent duplicating them, we
+    # have to check manually before POSTing.
+    for h in get_known_hosts(workspace, repository, user, password)['values']:
+        if h['hostname'] == hostname:
+            # This hostname is already known. No need to post.
+            return
+
+    response = requests.post(
+        url=f'https://api.bitbucket.org/2.0/repositories/{workspace}/{repository}/pipelines_config/ssh/known_hosts/',
+        json={
+            'type': 'pipeline_known_host',
+            'hostname': hostname,
+            'public_key': {
+                'type': 'pipeline_ssh_public_key',
+                'key_type': key_type,
+                'key': key,
+            }
         },
         auth=(user, password),
     )
