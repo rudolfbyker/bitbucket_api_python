@@ -1,2 +1,4 @@
 requests==2.*
+requests_oauthlib==1.*
+oauthlib==3.*
 crypto==1.*
